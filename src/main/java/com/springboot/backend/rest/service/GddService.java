@@ -6,77 +6,63 @@ import java.util.ArrayList;
 
 import java.util.List;
 
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.springboot.backend.rest.model.ResponseDate;
 
 /**
-* @author gonzaloguzman97@gmail.com
-*/
+ * @author gonzaloguzman97@gmail.com
+ */
 @Service
 public class GddService {
 
 	@Autowired
 	private Environment env;
 
-	@Autowired
-	private ObjectMapper mapper;
-
 	/**
-	 * Consume servicio GDD
-	 * utiliza endpoint a traves de archivo de propiedades
+	 * Consume servicio GDD utiliza endpoint a traves de archivo de propiedades
+	 * 
 	 * @return
 	 * @throws IOException
 	 */
-	public JsonNode getGddResponse() throws IOException {
+	public ResponseDate getGddResponse() throws IOException {
 
 		RestTemplate restTemplate = new RestTemplate();
-		ResponseEntity<String> response = restTemplate.getForEntity(env.getProperty("url"), String.class);
-		JsonNode json = mapper.readTree(response.getBody());
-		return getMissingDates(json);
-		
+		ResponseDate response = restTemplate.getForObject(env.getProperty("url"), ResponseDate.class);
+		return getMissingDates(response);
 	}
 
 	/**
 	 * retorna data procesada con las fechas faltantes
+	 * 
 	 * @param json
 	 * @return
 	 */
-	private JsonNode getMissingDates(JsonNode json) {
-		
-		LocalDate start = LocalDate.parse(json.get("fechaCreacion").asText());
-		LocalDate end = LocalDate.parse(json.get("fechaFin").asText());
-		
+	private ResponseDate getMissingDates(ResponseDate responseDate) {
+
+		LocalDate start = responseDate.getFechaCreacion();
+		LocalDate end = responseDate.getFechaFin();
 		List<LocalDate> dates = new ArrayList<>();
-		ArrayNode arrayNode = (ArrayNode) json.get("fechas");
-	
+
+		//Crea lista de todas las fechas desde fecha inicio a fin.
 		while (start.isBefore(end)) {
 			dates.add(start);
-		    start = start.plusMonths(1);
+			start = start.plusMonths(1);
 		}
-		
-		//Remueve elementos los elementos repetidos de la lista
-		for (JsonNode jsonNode : arrayNode) {
-			dates.removeIf(p -> p.toString().contains(jsonNode.asText()));
-		}
-		
-		//crea nuevo arreglo con las fechasFaltantes y lo agrega a la 
-		//respuesta final.
-		ArrayNode result = mapper.valueToTree(dates);
-		((ObjectNode) json).putArray("fechasFaltantes").addAll(result);
-		
-		return json;
+
+		// Remueve elementos los elementos repetidos de la lista
+		responseDate.getFechas().forEach(v -> {
+			dates.removeIf(p -> p.isEqual(v));
+		});
+
+		// llena la lista con las fechasFaltantes y lo agrega a la
+		// respuesta final.
+		responseDate.setFechasFaltantes(dates);
+	
+		return responseDate;
 	}
-	
-	
-	
-	
+
 }
